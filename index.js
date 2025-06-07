@@ -14,36 +14,35 @@ async function extractRSSAndContent(page, url) {
     // Step 2: If no RSS, extract content
     const title = await page.title();
     // const body = await page.$eval('body', el => el.innerText); // limit for now
-    let entries = [];
-
-    // Step 2: Try extracting from <article> tags
-    entries = await page.$$eval('article', articles => {
-      return articles.map(article => {
-        const sectionTitle = article.querySelector('h1, h2')?.innerText || "Section";
-        const summary =
-          article.querySelector('p')?.innerText ||
-          article.innerText.slice(0, 500);
-  
-        return {
-          sectionTitle,
-          sectionSummary: summary
-        };
+    let entries = await page.$$eval("article", articles => {
+        return articles.map(article => {
+          const sectionTitle = article.querySelector("h1, h2")?.innerText || "Section";
+          const summary = article.querySelector("p")?.innerText || article.innerText.slice(0, 500);
+          const linkEl = article.querySelector("a[href]");
+          const sectionURL = linkEl ? linkEl.href : null;
+    
+          return { sectionTitle, sectionSummary: summary, sectionURL };
+        });
       });
-    });
-  
-    // Step 3: Fallback if no <article> found
-    if (entries.length === 0) {
-      entries = await page.$$eval('h1, h2, h3 p, a', elements => {
-        const chunks = [];
-        for (let i = 0; i < elements.length; i += 2) {
-          chunks.push({
-            sectionTitle: elements[i]?.innerText || 'Section',
-            sectionSummary: elements[i + 1]?.innerText || ''
-          });
-        }
-        return chunks;
-      });
-    }
+    
+      if (entries.length === 0) {
+        entries = await page.$$eval("h1, h2, p, a[href]", elements => {
+          const chunks = [];
+          for (let i = 0; i < elements.length; i += 2) {
+            const titleEl = elements[i];
+            const summaryEl = elements[i + 1];
+    
+            const sectionTitle = titleEl?.innerText || "Section";
+            const sectionSummary = summaryEl?.innerText || "";
+    
+            const anchor = titleEl?.querySelector?.("a[href]") || summaryEl?.querySelector?.("a[href]");
+            const sectionURL = anchor?.href || null;
+    
+            chunks.push({ sectionTitle, sectionSummary, sectionURL });
+          }
+          return chunks;
+        });
+      }
   
     // Add page title to all entries
     entries = entries.map(entry => ({ pageTitle: title, ...entry }));
