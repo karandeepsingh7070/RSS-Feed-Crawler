@@ -56,7 +56,7 @@ async function extractRSSAndContent(page, url) {
     };
 }
 
-async function getInternalLinks(page, baseUrl) {
+async function getInternalLinks(page, baseUrl,scanType) {
     const base = new URL(baseUrl);
 
     const links = await page.$$eval('a[href]', (anchors, baseOrigin) => {
@@ -73,11 +73,11 @@ async function getInternalLinks(page, baseUrl) {
             .filter(link => link.startsWith(baseOrigin))
             .filter(link => !link.includes('#'));
     }, base.origin);
-
-    return [...new Set(links)].slice(0, 2); // Limit to 10 pages max
+    let sliceDepth = scanType === "brief" ? 2 : 10
+    return [...new Set(links)].slice(0, sliceDepth); // Limit to 10 pages max
 }
 
-async function crawlSite(startUrl) {
+async function crawlSite(startUrl,scanType) {
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
 
@@ -96,7 +96,7 @@ async function crawlSite(startUrl) {
             const result = await extractRSSAndContent(page, current);
             results.push(result);
 
-            const internalLinks = await getInternalLinks(page, startUrl);
+            const internalLinks = await getInternalLinks(page, startUrl,scanType);
             internalLinks.forEach(link => {
                 if (!visited.has(link)) toVisit.push(link);
             });
@@ -109,7 +109,6 @@ async function crawlSite(startUrl) {
     return results;
 }
 
-(async () => {
-    const data = await crawlSite('https://www.nytimes.com/');
-    console.log(JSON.stringify(data, null, 2));
-})();
+module.exports = {
+    crawlSite
+};
