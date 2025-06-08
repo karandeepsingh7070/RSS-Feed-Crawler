@@ -17,7 +17,7 @@ async function extractRSSAndContent(page, url) {
     let entries = await page.$$eval("article", articles => {
         return articles.map(article => {
           const sectionTitle = article.querySelector("h1, h2")?.innerText || "Section";
-          const summary = article.querySelector("p")?.innerText || article.innerText.slice(0, 500);
+          const summary = article.querySelector("p")?.innerText || article.innerText.slice(0, 2000);
           const linkEl = article.querySelector("a[href]");
           const sectionURL = linkEl ? linkEl.href : null;
     
@@ -72,7 +72,7 @@ async function getInternalLinks(page, baseUrl,scanType) {
             .filter(link => link.startsWith(baseOrigin))
             .filter(link => !link.includes('#'));
     }, base.origin);
-    let sliceDepth = scanType === "brief" ? 2 : 10
+    let sliceDepth = scanType === "brief" ? 2 : 0
     return [...new Set(links)].slice(0, sliceDepth); // Limit to 10 pages max
 }
 

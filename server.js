@@ -1,5 +1,6 @@
 const express = require("express");
 const { getEmbedding, cosineSimilarity } = require("./embedding.js");
+const { generateAnswer } = require("./generateAnswers.js");
 const { crawlSite } = require("./index.js")
 
 const app = express();
@@ -32,6 +33,7 @@ app.get("/extract", async (req, res) => {
           }
         }
         memoryStore[url] = dataWithEmbeddings;
+        console.log(memoryStore)
 
         res.json({ fromCache: false, data });
     } catch (err) {
@@ -53,9 +55,38 @@ app.get("/extract", async (req, res) => {
   
     const topMatches = scoredResults
       .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, 5); // return top 5 matches
+      .slice(0, 20); // top 20 matches
   
     res.json(topMatches);
+  });
+
+  app.post('/ask', async (req, res) => {
+    const { query, url } = req.query;
+    if (!query || !url) return res.status(400).json({ error: 'Missing query or siteUrl' });
+  
+    const allData = memoryStore[url];
+    console.log(memoryStore[url])
+    if (!allData) return res.status(404).json({ error: 'No data found for site' });
+  
+    const queryEmbedding = await getEmbedding(query);
+    const scored = allData
+      .map(item => ({
+        ...item,
+        score: cosineSimilarity(queryEmbedding, item.embedding)
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3); // top 3 matches
+  
+    const context = scored.map(s => `${s.sectionTitle}: ${s.sectionSummary}: URL ${s.sectionURL}`).join('\n\n');
+    const prompt = `Answer the question based on the content:\n\n${context}\n\nQ: ${query}\nA:`;
+  
+    const result = await generateAnswer(prompt);
+    console.log("results",result)
+    if(result?.length) {
+        res.json({ answer: result[0].generated_text });
+    }else {
+        res.json({ answer: "Not able to excecute the query"});
+    }
   });
 
 
